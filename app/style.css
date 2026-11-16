@@ -202,3 +202,17 @@ main[aria-busy="true"] { opacity: 0.55; transition: opacity 0.15s ease; }
   border-radius: 10px;
 }
 .filter:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+/* Sortable column headers: buttons styled to look like plain labels until
+ * hovered, with the active column underlined and arrowed. */
+.sortbtn {
+  all: unset;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.sortbtn:hover { color: var(--accent); text-decoration: underline; }
+.sortbtn.on { color: var(--ink); text-decoration: underline; }
+.sortbtn:focus-visible { outline: 2px solid var(--accent); border-radius: 3px; }

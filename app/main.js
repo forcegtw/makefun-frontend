@@ -75,8 +75,9 @@ async function route() {
       document.title = 'Bountyscope · make.fun bounties';
       const [data] = await Promise.all([getBounties(), import('./views.js')]);
       if (mine !== seq) return;
-      done(board(data));
-      wireFilter();
+      lastBoardData = data;
+      done(board(data, sortCol));
+      wireBoard(sortCol);
     }
   } catch (err) {
     if (mine !== seq) return;
@@ -89,24 +90,56 @@ async function route() {
   }
 }
 
-/** The board's filter box: hides rows that don't match, entirely client-side. */
-function wireFilter() {
+/** The board's interactive bits: the filter box and the sortable column
+ * headers. Sorting is pure client-side reordering of the same answer, so
+ * re-rendering from the cached data is instant and free. */
+let sortCol = '';
+let lastBoardData = null;
+
+function wireBoard(col) {
   const box = app.querySelector('#filter');
   const rows = [...app.querySelectorAll('ul.board li.row:not(.cols)')];
-  if (!box || !rows.length) return;
-  box.addEventListener('input', () => {
-    const q = box.value.trim().toLowerCase();
-    let shown = 0;
-    for (const li of rows) {
-      const hit = !q || li.textContent.toLowerCase().includes(q);
-      li.hidden = !hit;
-      if (hit) shown += 1;
-    }
-    const count = app.querySelector('.total');
-    if (count) count.hidden = Boolean(q);
-    const none = app.querySelector('.nofilter');
-    if (none) none.hidden = shown > 0;
-  });
+  if (box) {
+    box.addEventListener('input', () => {
+      const q = box.value.trim().toLowerCase();
+      let shown = 0;
+      for (const li of rows) {
+        const hit = !q || li.textContent.toLowerCase().includes(q);
+        li.hidden = !hit;
+        if (hit) shown += 1;
+      }
+      const count = app.querySelector('.total');
+      if (count) count.hidden = Boolean(q);
+      const none = app.querySelector('.nofilter');
+      if (none) none.hidden = shown > 0;
+    });
+    // Pressing / anywhere jumps focus into the filter box, like a search
+    // field on a keyboard-first site; Escape clears it and drops focus.
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== box && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        box.focus();
+      } else if (e.key === 'Escape' && document.activeElement === box && box.value) {
+        box.value = '';
+        box.dispatchEvent(new Event('input'));
+        box.blur();
+      }
+    });
+  }
+  for (const btn of app.querySelectorAll('button.sortbtn')) {
+    btn.addEventListener('click', () => {
+      sortCol = btn.dataset.sort === sortCol ? '' : btn.dataset.sort;
+      done(board(lastBoardData, sortCol));
+      wireBoard(sortCol);
+      // Keep the filter text through a re-sort: the rebuilt box starts empty,
+      // so restore and re-apply it here.
+      if (box && box.value) {
+        const nb = app.querySelector('#filter');
+        nb.value = box.value;
+        nb.dispatchEvent(new Event('input'));
+      }
+    });
+  }
 }
 
 window.addEventListener('hashchange', route);
