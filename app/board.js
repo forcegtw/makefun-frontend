@@ -46,10 +46,13 @@ export function board(data) {
     <h1>Open bounties</h1>
     <p class="total">${live.length} taking entries · ${money(total)} in live pots</p>
   </div>
+  <input id="filter" class="filter" type="search" placeholder="Filter bounties…"
+    aria-label="Filter bounties" autocomplete="off" spellcheck="false">
   <ul class="board">
     <li class="row cols" aria-hidden="true"><div class="grow">Bounty</div><div>Pot</div><div>Fee</div><div>Time</div><div>Entries</div></li>
     ${rows}
   </ul>
+  <p class="empty nofilter" hidden>No bounties match that filter.</p>
   ${items.length ? '' : '<p class="empty">No bounties are open right now.</p>'}
 </section>`;
 }
