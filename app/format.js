@@ -8,6 +8,7 @@ export function esc(value) {
 /** A dollar amount ('1000.00' or 0.5) as '$1,000' or '$0.50'. */
 export function money(value) {
   const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: Number.isInteger(n) ? 0 : 2 });
 }
 
@@ -26,4 +27,11 @@ export function timeLeft(iso) {
   if (days > 0) return `${days}d ${hours}h left`;
   if (hours > 0) return `${hours}h ${minutes}m left`;
   return `${minutes}m left`;
+}
+
+/** Whether a bounty still takes entries: the deadline decides, not the status
+ * alone — an entry the deadline passed may still read status open until its
+ * results are published. */
+export function isLive(b) {
+  return b.status === 'open' && new Date(b.deadline).getTime() > Date.now();
 }
