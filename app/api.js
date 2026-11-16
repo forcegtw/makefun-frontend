@@ -28,8 +28,27 @@ async function get(path) {
   return p;
 }
 
-/** The open bounties: { items: [...], next_cursor }. */
+/** The open bounties, one page at a time: { items, next_cursor }. The
+ * cursor comes back from the previous answer, so the board can grow a
+ * "load more" button instead of paying for 500 rows up front. */
 export const getBounties = () => get('/competitions?status=open&limit=50');
+export const getBountiesPage = (cursor) =>
+  get(`/competitions?status=open&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+
+/** Stale-while-revalidate for the board's first answer: hand back whatever
+ * cached copy exists right away (a render beats a spinner) and refresh in
+ * the background. onFresh receives the newer data only when the network
+ * actually had something different — a 304 or an identical answer is a
+ * no-op — so callers can redraw without flicker. */
+export function getBountiesSWR(onFresh) {
+  const path = '/competitions?status=open&limit=50';
+  const hit = cache.get(path);
+  const fresh = getBounties().then((data) => {
+    if (onFresh && !(hit && data === hit.data)) onFresh(data);
+    return data;
+  });
+  return hit ? Promise.resolve(hit.data) : fresh;
+}
 
 /** One bounty, by its slug. */
 export const getBounty = (slug) => get(`/competitions/${encodeURIComponent(slug)}`);
@@ -49,4 +68,12 @@ export function prefetchBounty(href) {
   const m = String(href || '').match(/^#\/bounty\/([^/]+)\/?$/);
   if (!m) return;
   get(`/competitions/${encodeURIComponent(decodeURIComponent(m[1]))}`).catch(() => {});
+}
+
+/** Same idea for an account page (#/u/<handle>): the leaderboard links to
+ * profiles, and warming the cache on hover makes the click feel instant. */
+export function prefetchProfile(href) {
+  const m = String(href || '').match(/^#\/u\/([^/]+)\/?$/);
+  if (!m) return;
+  get(`/profiles/${encodeURIComponent(decodeURIComponent(m[1]))}`).catch(() => {});
 }

@@ -12,7 +12,7 @@
 // window.__shotReady is false while a page loads and true once its data has
 // rendered, for any script that takes screenshots.
 
-import { getBounties } from './api.js';
+import { getBountiesPage, getBountiesSWR } from './api.js';
 import { board } from './board.js';
 
 const app = document.getElementById('app');
@@ -73,10 +73,22 @@ async function route() {
       done(views.profilePage(p));
     } else {
       document.title = 'Bountyscope · make.fun bounties';
-      const [data] = await Promise.all([getBounties(), import('./views.js')]);
+      const [first] = await Promise.all([
+        getBountiesSWR((fresh) => {
+          // The revalidated answer landed after the render: swap the page
+          // list in place so the board updates without losing the filter or
+          // the sort, but only if the board is still what's on screen.
+          if (mine === seq && lastBoardData) {
+            pages = [fresh];
+            redrawBoard();
+          }
+        }),
+        import('./views.js'),
+      ]);
       if (mine !== seq) return;
-      lastBoardData = data;
-      done(board(data, sortCol, sortDir));
+      pages = [first];
+      lastBoardData = first;
+      done(board(first, sortCol, sortDir, pages));
       wireBoard();
     }
   } catch (err) {
@@ -104,10 +116,12 @@ async function route() {
 let sortCol = '';
 let sortDir = '';
 let lastBoardData = null;
+/** The board's fetched pages, oldest first; a SWR refresh replaces them all. */
+let pages = [];
 
 /** Redraw the board from cached data and re-wire it, keeping the filter text. */
 function redrawBoard() {
-  done(board(lastBoardData, sortCol, sortDir));
+  done(board(lastBoardData, sortCol, sortDir, pages));
   wireBoard();
   const prev = redrawBoard.prevFilter;
   if (prev) {
@@ -176,6 +190,36 @@ function wireBoard() {
       }
       redrawBoard();
     });
+  }
+  // "Load more" appends the next cursor page to what's already rendered.
+  // The button disappears while its fetch is inflight so a double click
+  // can't fire two requests for the same cursor; the inflight map in the
+  // API would de-duplicate anyway, but the visual state should match.
+  const more = app.querySelector('button.morebtn');
+  if (more) {
+    more.addEventListener('click', async () => {
+      const cursor = more.dataset.cursor;
+      more.disabled = true;
+      more.textContent = 'Loading…';
+      try {
+        const page = await getBountiesPage(cursor);
+        pages.push(page);
+        redrawBoard();
+      } catch (err) {
+        more.disabled = false;
+        more.textContent = `Couldn't load more: ${String(err.message || err)}`;
+      }
+    });
+  }
+  // Profile links on the leaderboard prefetch on hover the same way the
+  // board's bounty links do, so clicking through to an account usually
+  // renders from cache. One delegated listener instead of one per link.
+  if (!window.__bountyHover) {
+    window.__bountyHover = true;
+    document.addEventListener('pointerover', (e) => {
+      const a = e.target && e.target.closest && e.target.closest('a.who');
+      if (a) import('./api.js').then((api) => api.prefetchProfile(a.getAttribute('href')));
+    }, { capture: true });
   }
 }
 

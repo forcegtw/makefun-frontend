@@ -71,8 +71,10 @@ function head(label, key, active, dir) {
   return `<div aria-sort="${dirWord}"><button type="button" class="sortbtn${on ? ' on' : ''}" data-sort="${key}" title="Sort by ${label.toLowerCase()}${on ? ', again to flip the direction' : ''}" aria-label="Sort by ${label.toLowerCase()}${on ? `, currently ${dirWord}` : ''}">${label}${arrow}</button></div>`;
 }
 
-export function board(data, active = '', dir = '') {
-  const all = (data && data.items) || [];
+export function board(data, active = '', dir = '', pages = []) {
+  const all = pages.flatMap((p) => p.items || []);
+  const last = pages[pages.length - 1];
+  const more = last && last.next_cursor;
   const items = sortItems(all, active, dir);
   const live = all.filter(isLive);
   const total = live.reduce((s, b) => s + Number(b.potUsd ?? b.rewardAmount ?? 0), 0);
@@ -88,6 +90,7 @@ export function board(data, active = '', dir = '') {
     <li class="row cols" aria-hidden="false">${head('Bounty', '', active, dir)}${head('Pot', 'pot', active, dir)}${head('Fee', 'fee', active, dir)}${head('Time', 'time', active, dir)}${head('Entries', 'entries', active, dir)}</li>
     ${rows}
   </ul>
+  ${more ? `<p class="more"><button type="button" class="morebtn" data-cursor="${encodeURIComponent(more)}">Load more bounties <span class="k">(showing ${all.length})</span></button></p>` : ''}
   <p class="empty nofilter" hidden>No bounties match that filter.</p>
   ${items.length ? '' : '<p class="empty">No bounties are open right now.</p>'}
 </section>`;

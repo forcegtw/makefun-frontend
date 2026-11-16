@@ -221,3 +221,21 @@ main[aria-busy="true"] { opacity: 0.55; transition: opacity 0.15s ease; }
 .sortbtn:hover { color: var(--accent); text-decoration: underline; }
 .sortbtn.on { color: var(--ink); text-decoration: underline; }
 .sortbtn:focus-visible { outline: 2px solid var(--accent); border-radius: 3px; }
+
+/* "Load more bounties": a quiet pill under the board that only shows when
+ * the API reports another cursor page. The count inside renders smaller. */
+.more { margin: 14px 0 0; text-align: center; }
+.morebtn {
+  all: unset;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--soft);
+}
+.morebtn .k { font-size: 11.5px; color: var(--soft); opacity: 0.8; }
+.morebtn:hover:not(:disabled) { color: var(--ink); border-color: var(--accent); }
+.morebtn:focus-visible { outline: 2px solid var(--accent); }
+.morebtn:disabled { cursor: default; opacity: 0.7; }
