@@ -76,8 +76,8 @@ async function route() {
       const [data] = await Promise.all([getBounties(), import('./views.js')]);
       if (mine !== seq) return;
       lastBoardData = data;
-      done(board(data, sortCol));
-      wireBoard(sortCol);
+      done(board(data, sortCol, sortDir));
+      wireBoard();
     }
   } catch (err) {
     if (mine !== seq) return;
@@ -86,21 +86,46 @@ async function route() {
   }
   if (mine === seq) {
     window.scrollTo(0, 0);
+    // Hand keyboard focus to the freshly rendered content so a screen reader
+    // announces the new view instead of leaving focus on a dead element.
+    const h1 = app.querySelector('h1');
+    if (h1) {
+      h1.tabIndex = -1;
+      h1.focus({ preventScroll: true });
+    }
     window.__shotReady = true;
   }
 }
 
 /** The board's interactive bits: the filter box and the sortable column
  * headers. Sorting is pure client-side reordering of the same answer, so
- * re-rendering from the cached data is instant and free. */
+ * re-rendering from the cached data is instant and free. A second click on
+ * the active column flips its direction instead of clearing the sort. */
 let sortCol = '';
+let sortDir = '';
 let lastBoardData = null;
 
-function wireBoard(col) {
+/** Redraw the board from cached data and re-wire it, keeping the filter text. */
+function redrawBoard() {
+  done(board(lastBoardData, sortCol, sortDir));
+  wireBoard();
+  const prev = redrawBoard.prevFilter;
+  if (prev) {
+    const nb = app.querySelector('#filter');
+    if (nb) {
+      nb.value = prev;
+      nb.dispatchEvent(new Event('input'));
+    }
+  }
+}
+redrawBoard.prevFilter = '';
+
+function wireBoard() {
   const box = app.querySelector('#filter');
   const rows = [...app.querySelectorAll('ul.board li.row:not(.cols)')];
   if (box) {
     box.addEventListener('input', () => {
+      redrawBoard.prevFilter = box.value;
       const q = box.value.trim().toLowerCase();
       let shown = 0;
       for (const li of rows) {
@@ -115,32 +140,59 @@ function wireBoard(col) {
     });
     // Pressing / anywhere jumps focus into the filter box, like a search
     // field on a keyboard-first site; Escape clears it and drops focus.
-    window.addEventListener('keydown', (e) => {
-      if (e.key === '/' && document.activeElement !== box && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        box.focus();
-      } else if (e.key === 'Escape' && document.activeElement === box && box.value) {
-        box.value = '';
-        box.dispatchEvent(new Event('input'));
-        box.blur();
-      }
-    });
+    // Wired once, on a capture-phase flag, so re-sorts don't stack listeners.
+    if (!window.__bountyKeys) {
+      window.__bountyKeys = true;
+      window.addEventListener('keydown', (e) => {
+        const b = app.querySelector('#filter');
+        if (!b) return;
+        if (e.key === '/' && document.activeElement !== b && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          b.focus();
+        } else if (e.key === 'Escape' && document.activeElement === b && b.value) {
+          b.value = '';
+          b.dispatchEvent(new Event('input'));
+          b.blur();
+        }
+      });
+    }
+  }
+  // Hovering a bounty link starts its page fetch before the click lands,
+  // so the detail view often renders from cache the instant it's wanted.
+  // pointerenter (not mouseenter) so touch/stylus users benefit too; the
+  // api module de-duplicates via its inflight map, so this is always cheap.
+  for (const a of app.querySelectorAll('a.title')) {
+    a.addEventListener('pointerenter', () => {
+      import('./api.js').then((api) => api.prefetchBounty(a.getAttribute('href')));
+    }, { once: true });
   }
   for (const btn of app.querySelectorAll('button.sortbtn')) {
     btn.addEventListener('click', () => {
-      sortCol = btn.dataset.sort === sortCol ? '' : btn.dataset.sort;
-      done(board(lastBoardData, sortCol));
-      wireBoard(sortCol);
-      // Keep the filter text through a re-sort: the rebuilt box starts empty,
-      // so restore and re-apply it here.
-      if (box && box.value) {
-        const nb = app.querySelector('#filter');
-        nb.value = box.value;
-        nb.dispatchEvent(new Event('input'));
+      if (btn.dataset.sort === sortCol) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortCol = btn.dataset.sort;
+        sortDir = '';
       }
+      redrawBoard();
     });
   }
 }
+
+/** The board's time chips and the bounty page's "time left" line count down
+ * against Date.now() but only change on a render, so they drift stale while
+ * a visitor keeps a tab open. A quiet minute tick redraws the board from its
+ * cached data — instant, no fetch — whenever the board is what's on screen. */
+let tick = null;
+function keepFresh() {
+  clearInterval(tick);
+  tick = setInterval(() => {
+    // Only when the board itself is on screen; lastBoardData lingers after
+    // navigating away and redrawing then would clobber the current view.
+    if (lastBoardData && app.querySelector('#filter') && !app.getAttribute('aria-busy')) redrawBoard();
+  }, 60000);
+}
+keepFresh();
 
 window.addEventListener('hashchange', route);
 route();

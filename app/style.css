@@ -173,6 +173,11 @@ tr:last-child td { border-bottom: none; }
 .sols { list-style: none; padding: 0; }
 .sols li { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
 
+/* Focus is moved to the view's h1 on route change purely so screen readers
+ * announce the new page; the ring stays invisible (keyboard users already
+ * navigate within the page with Tab, not by re-triggering the route change). */
+main h1:focus { outline: none; }
+
 /* Loading: while a route fetches, the old view dims instead of disappearing;
  * on a cold start a light skeleton shows in its place. */
 main[aria-busy="true"] { opacity: 0.55; transition: opacity 0.15s ease; }

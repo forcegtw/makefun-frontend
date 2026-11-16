@@ -40,3 +40,13 @@ export const getLeaderboard = (slug, limit = 50) =>
 
 /** An account's public profile by its handle. */
 export const getProfile = (handle) => get(`/profiles/${encodeURIComponent(handle)}`);
+
+/** Start loading one bounty without awaiting it: the board prefetches on
+ * hover so a click usually renders from cache. The inflight map de-duplicates
+ * against the real fetch; a failure here is fine to ignore because the click
+ * path fetches and reports errors itself. */
+export function prefetchBounty(href) {
+  const m = String(href || '').match(/^#\/bounty\/([^/]+)\/?$/);
+  if (!m) return;
+  get(`/competitions/${encodeURIComponent(decodeURIComponent(m[1]))}`).catch(() => {});
+}

@@ -38,10 +38,11 @@ const DEFAULT_ORDER = (a, b) => {
 };
 
 /** Sort the items for one column. Everything ranks descending except time,
- * where soonest-first is the useful direction. */
-export function sortItems(all, key) {
+ * where soonest-first is the useful direction; an explicit direction from a
+ * second click on the same header wins over that default. */
+export function sortItems(all, key, dir) {
   if (!key) return [...all].sort(DEFAULT_ORDER);
-  const sign = key === 'time' ? 1 : -1;
+  const sign = (dir || (key === 'time' ? 'asc' : 'desc')) === 'asc' ? 1 : -1;
   return [...all].sort((a, b) => sign * (metric(key, a) - metric(key, b)) || DEFAULT_ORDER(a, b));
 }
 
@@ -60,17 +61,19 @@ function row(b) {
 }
 
 /** A column header: a button when the column can sort, plain text otherwise.
- * The active column shows an arrow so the state stays readable after the
- * re-render. */
-function head(label, key, active) {
+ * The active column shows an arrow pointing along the current direction so
+ * the state stays readable after the re-render. */
+function head(label, key, active, dir) {
   if (!key) return `<div>${label}</div>`;
-  const arrow = active === key ? ' ↓' : '';
-  return `<div><button type="button" class="sortbtn${active === key ? ' on' : ''}" data-sort="${key}" title="Sort by ${label.toLowerCase()}">${label}${arrow}</button></div>`;
+  const on = active === key;
+  const arrow = on ? (dir === 'asc' ? ' ↑' : ' ↓') : '';
+  const dirWord = on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  return `<div aria-sort="${dirWord}"><button type="button" class="sortbtn${on ? ' on' : ''}" data-sort="${key}" title="Sort by ${label.toLowerCase()}${on ? ', again to flip the direction' : ''}" aria-label="Sort by ${label.toLowerCase()}${on ? `, currently ${dirWord}` : ''}">${label}${arrow}</button></div>`;
 }
 
-export function board(data, active = '') {
+export function board(data, active = '', dir = '') {
   const all = (data && data.items) || [];
-  const items = sortItems(all, active);
+  const items = sortItems(all, active, dir);
   const live = all.filter(isLive);
   const total = live.reduce((s, b) => s + Number(b.potUsd ?? b.rewardAmount ?? 0), 0);
   const rows = items.map(row).join('');
@@ -82,7 +85,7 @@ export function board(data, active = '') {
   <input id="filter" class="filter" type="search" placeholder="Filter bounties…  (press / to jump here)"
     aria-label="Filter bounties" autocomplete="off" spellcheck="false">
   <ul class="board">
-    <li class="row cols" aria-hidden="false">${head('Bounty', '')}${head('Pot', 'pot', active)}${head('Fee', 'fee', active)}${head('Time', 'time', active)}${head('Entries', 'entries', active)}</li>
+    <li class="row cols" aria-hidden="false">${head('Bounty', '', active, dir)}${head('Pot', 'pot', active, dir)}${head('Fee', 'fee', active, dir)}${head('Time', 'time', active, dir)}${head('Entries', 'entries', active, dir)}</li>
     ${rows}
   </ul>
   <p class="empty nofilter" hidden>No bounties match that filter.</p>

@@ -75,7 +75,7 @@ export function bountyPage(b) {
     ${b.sponsor ? `<div class="fact"><span class="k">Sponsor</span><span class="v">${esc(b.sponsor.name)}${b.sponsor.isVerified ? ' ✓' : ''}</span></div>` : ''}
   </div>
   <nav class="tabs">
-    <a class="tab on" href="#/bounty/${slug}">Overview</a>
+    <a class="tab on" aria-current="page" href="#/bounty/${slug}">Overview</a>
     <a class="tab" href="#/bounty/${slug}/leaderboard">Leaderboard</a>
   </nav>
   ${rewards.length ? `<h2>Rewards</h2>
@@ -99,7 +99,7 @@ export function leaderboardPage(b, lb) {
   <div class="headrow"><h1>${esc(lb.title || 'Leaderboard')}</h1><span class="chip calm">${b.submissionCount ?? 0} entries</span></div>
   <nav class="tabs">
     <a class="tab" href="#/bounty/${slug}">Overview</a>
-    <a class="tab on" href="#/bounty/${slug}/leaderboard">Leaderboard</a>
+    <a class="tab on" aria-current="page" href="#/bounty/${slug}/leaderboard">Leaderboard</a>
   </nav>
   ${entries.length ? `<table class="lb">
     <tr><th>#</th><th>Entrant</th><th>Entry</th>${lb.columns.map((c) => `<th>${esc(c.title)}</th>`).join('')}</tr>
