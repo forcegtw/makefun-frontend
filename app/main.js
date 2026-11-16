@@ -44,7 +44,7 @@ function done(html) {
 async function route() {
   const mine = ++seq;
   window.__shotReady = false;
-  const hash = location.hash || '#/';
+  const hash = (location.hash || '#/').split('?')[0] || '#/';
   const lb = hash.match(/^#\/bounty\/([^/]+)\/leaderboard\/?$/);
   const one = hash.match(/^#\/bounty\/([^/]+)\/?$/);
   const who = hash.match(/^#\/u\/([^/]+)\/?$/);
@@ -88,7 +88,8 @@ async function route() {
       if (mine !== seq) return;
       pages = [first];
       lastBoardData = first;
-      done(board(first, sortCol, sortDir, pages));
+      const v = readView();
+      done(board(first, v.sortCol, v.sortDir, pages, v));
       wireBoard();
     }
   } catch (err) {
@@ -112,16 +113,46 @@ async function route() {
 /** The board's interactive bits: the filter box and the sortable column
  * headers. Sorting is pure client-side reordering of the same answer, so
  * re-rendering from the cached data is instant and free. A second click on
- * the active column flips its direction instead of clearing the sort. */
-let sortCol = '';
-let sortDir = '';
+ * the active column flips its direction instead of clearing the sort. The
+ * sort lives in the hash query via readView/writeView, like the rest of the
+ * view state, so a shared link carries it. */
 let lastBoardData = null;
 /** The board's fetched pages, oldest first; a SWR refresh replaces them all. */
 let pages = [];
 
+/** The board's view state — hide-ended, active category and the sort — lives
+ * in the hash's query part (`#/?hide=1&cat=X&sort=pot&dir=asc`) so a shared
+ * link restores the exact view. readView is the single source of truth:
+ * sortCol/sortDir module vars were dropped; every read goes to the URL. */
+function readView() {
+  const q = (location.hash.match(/^[^?]*\?(.*)$/) || [])[1] || '';
+  const p = new URLSearchParams(q);
+  return {
+    hideEnded: p.get('hide') === '1',
+    category: p.get('cat') || '',
+    sortCol: p.get('sort') || '',
+    sortDir: p.get('dir') || '',
+  };
+}
+
+/** Write the view state back into the hash without touching the route part,
+ * replacing (not pushing) so toggling a chip doesn't flood the history. */
+function writeView(view) {
+  const route = (location.hash || '#/').split('?')[0] || '#/';
+  const p = new URLSearchParams();
+  if (view.hideEnded) p.set('hide', '1');
+  if (view.category) p.set('cat', view.category);
+  if (view.sortCol) p.set('sort', view.sortCol);
+  if (view.sortDir) p.set('dir', view.sortDir);
+  const q = p.toString();
+  const next = q ? `${route}?${q}` : route;
+  if (next !== location.hash) history.replaceState(null, '', next);
+}
+
 /** Redraw the board from cached data and re-wire it, keeping the filter text. */
 function redrawBoard() {
-  done(board(lastBoardData, sortCol, sortDir, pages));
+  const v = readView();
+  done(board(lastBoardData, v.sortCol, v.sortDir, pages, v));
   wireBoard();
   const prev = redrawBoard.prevFilter;
   if (prev) {
@@ -182,12 +213,34 @@ function wireBoard() {
   }
   for (const btn of app.querySelectorAll('button.sortbtn')) {
     btn.addEventListener('click', () => {
-      if (btn.dataset.sort === sortCol) {
-        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      const v = readView();
+      if (btn.dataset.sort === v.sortCol) {
+        v.sortDir = v.sortDir === 'asc' ? 'desc' : 'asc';
       } else {
-        sortCol = btn.dataset.sort;
-        sortDir = '';
+        v.sortCol = btn.dataset.sort;
+        v.sortDir = '';
       }
+      writeView(v);
+      redrawBoard();
+    });
+  }
+  // "Hide ended" and the category chips are view state: flipping one updates
+  // the hash (replaceState, so Back still means "previous page") and redraws
+  // from the same cached answer — no fetch, instant.
+  const hide = app.querySelector('#hideended');
+  if (hide) {
+    hide.addEventListener('change', () => {
+      const v = readView();
+      v.hideEnded = hide.checked;
+      writeView(v);
+      redrawBoard();
+    });
+  }
+  for (const btn of app.querySelectorAll('button.catbtn')) {
+    btn.addEventListener('click', () => {
+      const v = readView();
+      v.category = btn.dataset.cat;
+      writeView(v);
       redrawBoard();
     });
   }

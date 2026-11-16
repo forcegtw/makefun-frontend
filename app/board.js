@@ -46,6 +46,19 @@ export function sortItems(all, key, dir) {
   return [...all].sort((a, b) => sign * (metric(key, a) - metric(key, b)) || DEFAULT_ORDER(a, b));
 }
 
+/** Keep a bounty when the view allows its kind: "hide ended" drops anything
+ * past its deadline, and a category filter keeps only that category. Both
+ * are URL state, so a shared link restores the same view. */
+export function visibleItems(all, { hideEnded, category } = {}) {
+  let out = all;
+  if (hideEnded) out = out.filter(isLive);
+  if (category) {
+    const cat = category.toLowerCase();
+    out = out.filter((b) => String(b.category || '').toLowerCase() === cat);
+  }
+  return out;
+}
+
 /** One row of the board: the numbers a hunter scans first. */
 function row(b) {
   return `<li class="row">
@@ -71,14 +84,23 @@ function head(label, key, active, dir) {
   return `<div aria-sort="${dirWord}"><button type="button" class="sortbtn${on ? ' on' : ''}" data-sort="${key}" title="Sort by ${label.toLowerCase()}${on ? ', again to flip the direction' : ''}" aria-label="Sort by ${label.toLowerCase()}${on ? `, currently ${dirWord}` : ''}">${label}${arrow}</button></div>`;
 }
 
-export function board(data, active = '', dir = '', pages = []) {
+export function board(data, active = '', dir = '', pages = [], view = {}) {
   const all = pages.flatMap((p) => p.items || []);
   const last = pages[pages.length - 1];
   const more = last && last.next_cursor;
-  const items = sortItems(all, active, dir);
+  const shown = visibleItems(all, view);
+  const items = sortItems(shown, active, dir);
   const live = all.filter(isLive);
   const total = live.reduce((s, b) => s + Number(b.potUsd ?? b.rewardAmount ?? 0), 0);
   const rows = items.map(row).join('');
+  // The categories present in the data, most entries first, so the chips
+  // always match what's actually loaded — no hardcoded list to drift.
+  const cats = new Map();
+  for (const b of all) {
+    const c = String(b.category || '').trim();
+    if (c) cats.set(c, (cats.get(c) || 0) + 1);
+  }
+  const catList = [...cats.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return `<section>
   <div class="headrow">
     <h1>Open bounties</h1>
@@ -86,12 +108,19 @@ export function board(data, active = '', dir = '', pages = []) {
   </div>
   <input id="filter" class="filter" type="search" placeholder="Filter bounties…  (press / to jump here)"
     aria-label="Filter bounties" autocomplete="off" spellcheck="false">
+  <div class="viewbar">
+    <label class="toggle"><input type="checkbox" id="hideended"${view.hideEnded ? ' checked' : ''}> Hide ended</label>
+    <div class="cats">
+      <button type="button" class="catbtn${view.category ? '' : ' on'}" data-cat="" aria-pressed="${view.category ? 'false' : 'true'}">All</button>
+      ${catList.map(([c, n]) => `<button type="button" class="catbtn${view.category === c ? ' on' : ''}" data-cat="${esc(c)}" aria-pressed="${view.category === c ? 'true' : 'false'}">${esc(c)} <span class="k">${n}</span></button>`).join('')}
+    </div>
+  </div>
   <ul class="board">
     <li class="row cols" aria-hidden="false">${head('Bounty', '', active, dir)}${head('Pot', 'pot', active, dir)}${head('Fee', 'fee', active, dir)}${head('Time', 'time', active, dir)}${head('Entries', 'entries', active, dir)}</li>
     ${rows}
   </ul>
-  ${more ? `<p class="more"><button type="button" class="morebtn" data-cursor="${encodeURIComponent(more)}">Load more bounties <span class="k">(showing ${all.length})</span></button></p>` : ''}
+  ${more ? `<p class="more"><button type="button" class="morebtn" data-cursor="${encodeURIComponent(more)}">Load more bounties <span class="k">(showing ${shown.length})</span></button></p>` : ''}
   <p class="empty nofilter" hidden>No bounties match that filter.</p>
-  ${items.length ? '' : '<p class="empty">No bounties are open right now.</p>'}
+  ${items.length ? '' : `<p class="empty">${all.length ? 'Nothing matches this view — clear the filter or pick another category.' : 'No bounties are open right now.'}</p>`}
 </section>`;
 }
