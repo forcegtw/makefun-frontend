@@ -172,3 +172,52 @@ tr:last-child td { border-bottom: none; }
 .who-head { display: flex; gap: 16px; align-items: center; margin-bottom: 18px; }
 .sols { list-style: none; padding: 0; }
 .sols li { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+
+/* Focus is moved to the view's h1 on route change purely so screen readers
+ * announce the new page; the ring stays invisible (keyboard users already
+ * navigate within the page with Tab, not by re-triggering the route change). */
+main h1:focus { outline: none; }
+
+/* Loading: while a route fetches, the old view dims instead of disappearing;
+ * on a cold start a light skeleton shows in its place. */
+main[aria-busy="true"] { opacity: 0.55; transition: opacity 0.15s ease; }
+.skl {
+  display: inline-block;
+  height: 13px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--line) 25%, #f0f4f8 50%, var(--line) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+.skl.w70 { width: 70%; margin-bottom: 8px; }
+.skl.w40 { width: 40%; }
+.skl.w8 { width: 4.5em; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skl { animation: none; } }
+
+/* The board's filter box. */
+.filter {
+  width: 100%;
+  margin: 4px 0 14px;
+  padding: 9px 14px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.filter:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+/* Sortable column headers: buttons styled to look like plain labels until
+ * hovered, with the active column underlined and arrowed. */
+.sortbtn {
+  all: unset;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.sortbtn:hover { color: var(--accent); text-decoration: underline; }
+.sortbtn.on { color: var(--ink); text-decoration: underline; }
+.sortbtn:focus-visible { outline: 2px solid var(--accent); border-radius: 3px; }
